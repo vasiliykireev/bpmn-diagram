@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_OnlineStoreSales" targetNamespace="http://example.com/bpmn/online-store-sales" exporter="Camunda Web Modeler" exporterVersion="30fe6a4">
+  <bpmn:message id="Message_OrderPlaced" name="Заказ оформлен" />
+  <bpmn:message id="Message_OrderConfirmed" name="Заказ подтвержден" />
+  <bpmn:message id="Message_PaymentReceived" name="Оплата получена" />
+  <bpmn:message id="Message_ShipmentNotification" name="Заказ отгружен" />
+  <bpmn:message id="Message_OutOfStock" name="Товара нет в наличии" />
+  <bpmn:collaboration id="Collaboration_OnlineStoreSales" name="Продажа в интернет-магазине">
+    <bpmn:participant id="Participant_Customer" name="Покупатель" />
+    <bpmn:participant id="Participant_Store" name="Интернет-магазин" processRef="Process_Store" />
+    <bpmn:messageFlow id="MessageFlow_OrderPlaced" name="Оформленный заказ" sourceRef="Participant_Customer" targetRef="StartEvent_OrderReceived" />
+    <bpmn:messageFlow id="MessageFlow_OrderConfirmed" name="Подтверждение заказа" sourceRef="Task_SendOrderConfirmation" targetRef="Participant_Customer" />
+    <bpmn:messageFlow id="MessageFlow_PaymentReceived" name="Данные об оплате" sourceRef="Participant_Customer" targetRef="IntermediateCatchEvent_PaymentReceived" />
+    <bpmn:messageFlow id="MessageFlow_ShipmentNotification" name="Уведомление об отгрузке" sourceRef="Task_ShipOrder" targetRef="Participant_Customer" />
+    <bpmn:messageFlow id="MessageFlow_OutOfStock" name="Уведомление об отсутствии товара" sourceRef="Task_NotifyOutOfStock" targetRef="Participant_Customer" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Store" name="Обработка заказа в интернет-магазине" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Store">
+      <bpmn:lane id="Lane_Sales" name="Отдел продаж">
+        <bpmn:flowNodeRef>StartEvent_OrderReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegisterOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckStock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_InStock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendOrderConfirmation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateCatchEvent_PaymentReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyOutOfStock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_OrderCancelled</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Warehouse" name="Склад и логистика">
+        <bpmn:flowNodeRef>Task_PickAndPack</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ShipOrder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_OrderCompleted</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:sequenceFlow id="Flow_Store_10" sourceRef="Task_NotifyOutOfStock" targetRef="EndEvent_OrderCancelled" />
+    <bpmn:sequenceFlow id="Flow_Store_8" sourceRef="Task_ShipOrder" targetRef="EndEvent_OrderCompleted" />
+    <bpmn:sequenceFlow id="Flow_Store_7" sourceRef="Task_PickAndPack" targetRef="Task_ShipOrder" />
+    <bpmn:sequenceFlow id="Flow_Store_6" sourceRef="IntermediateCatchEvent_PaymentReceived" targetRef="Task_PickAndPack" />
+    <bpmn:sequenceFlow id="Flow_Store_5" sourceRef="Task_SendOrderConfirmation" targetRef="IntermediateCatchEvent_PaymentReceived" />
+    <bpmn:sequenceFlow id="Flow_Store_4" name="Да" sourceRef="Gateway_InStock" targetRef="Task_SendOrderConfirmation" />
+    <bpmn:sequenceFlow id="Flow_Store_3" sourceRef="Task_CheckStock" targetRef="Gateway_InStock" />
+    <bpmn:sequenceFlow id="Flow_Store_2" sourceRef="Task_RegisterOrder" targetRef="Task_CheckStock" />
+    <bpmn:sequenceFlow id="Flow_Store_1" sourceRef="StartEvent_OrderReceived" targetRef="Task_RegisterOrder" />
+    <bpmn:endEvent id="EndEvent_OrderCancelled" name="Заказ отменен">
+      <bpmn:incoming>Flow_Store_10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="Task_NotifyOutOfStock" name="Сообщить об отсутствии товара">
+      <bpmn:incoming>Flow_Store_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_10</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="EndEvent_OrderCompleted" name="Заказ завершен">
+      <bpmn:incoming>Flow_Store_8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:task id="Task_ShipOrder" name="Отгрузить заказ">
+      <bpmn:incoming>Flow_Store_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_8</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_PickAndPack" name="Скомплектовать и упаковать заказ">
+      <bpmn:incoming>Flow_Store_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_7</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:intermediateCatchEvent id="IntermediateCatchEvent_PaymentReceived" name="Получить подтверждение оплаты">
+      <bpmn:incoming>Flow_Store_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_6</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_PaymentReceived" messageRef="Message_PaymentReceived" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:task id="Task_SendOrderConfirmation" name="Подтвердить заказ покупателю">
+      <bpmn:incoming>Flow_Store_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_5</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="Gateway_InStock" name="Товар в наличии?" default="Flow_Store_4">
+      <bpmn:incoming>Flow_Store_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Store_9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_CheckStock" name="Проверить наличие товара">
+      <bpmn:incoming>Flow_Store_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_3</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_RegisterOrder" name="Зарегистрировать заказ">
+      <bpmn:incoming>Flow_Store_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_Store_2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:startEvent id="StartEvent_OrderReceived" name="Получен заказ">
+      <bpmn:outgoing>Flow_Store_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_OrderPlaced" messageRef="Message_OrderPlaced" />
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="Flow_Store_9" name="Нет" sourceRef="Gateway_InStock" targetRef="Task_NotifyOutOfStock" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_OnlineStoreSales">
+    <bpmndi:BPMNPlane id="BPMNPlane_OnlineStoreSales" bpmnElement="Collaboration_OnlineStoreSales">
+      <bpmndi:BPMNShape id="ParticipantShape_Customer" bpmnElement="Participant_Customer" isHorizontal="true">
+        <dc:Bounds x="100" y="80" width="1800" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ParticipantShape_Store" bpmnElement="Participant_Store" isHorizontal="true">
+        <dc:Bounds x="100" y="340" width="1800" height="360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_Warehouse" bpmnElement="Lane_Warehouse" isHorizontal="true">
+        <dc:Bounds x="130" y="520" width="1770" height="180" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_Sales" bpmnElement="Lane_Sales" isHorizontal="true">
+        <dc:Bounds x="130" y="340" width="1770" height="180" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_StartEvent_OrderReceived" bpmnElement="StartEvent_OrderReceived">
+        <dc:Bounds x="430" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="411" y="448" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_RegisterOrder" bpmnElement="Task_RegisterOrder">
+        <dc:Bounds x="510" y="390" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_CheckStock" bpmnElement="Task_CheckStock">
+        <dc:Bounds x="670" y="390" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Gateway_InStock" bpmnElement="Gateway_InStock" isMarkerVisible="true">
+        <dc:Bounds x="830" y="405" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="830" y="368" width="49" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_SendOrderConfirmation" bpmnElement="Task_SendOrderConfirmation">
+        <dc:Bounds x="920" y="390" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_IntermediateCatchEvent_PaymentReceived" bpmnElement="IntermediateCatchEvent_PaymentReceived">
+        <dc:Bounds x="1080" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1125.5" y="410" width="83" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_PickAndPack" bpmnElement="Task_PickAndPack">
+        <dc:Bounds x="1460" y="550" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_ShipOrder" bpmnElement="Task_ShipOrder">
+        <dc:Bounds x="1620" y="550" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent_OrderCompleted" bpmnElement="EndEvent_OrderCompleted">
+        <dc:Bounds x="1800" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1777" y="608" width="83" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_NotifyOutOfStock" bpmnElement="Task_NotifyOutOfStock">
+        <dc:Bounds x="1220" y="430" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent_OrderCancelled" bpmnElement="EndEvent_OrderCancelled">
+        <dc:Bounds x="1422" y="452" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1403" y="488" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_1" bpmnElement="Flow_Store_1">
+        <di:waypoint x="466" y="430" />
+        <di:waypoint x="510" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_2" bpmnElement="Flow_Store_2">
+        <di:waypoint x="630" y="430" />
+        <di:waypoint x="670" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_3" bpmnElement="Flow_Store_3">
+        <di:waypoint x="790" y="430" />
+        <di:waypoint x="830" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_4" bpmnElement="Flow_Store_4">
+        <di:waypoint x="880" y="430" />
+        <di:waypoint x="920" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="893" y="405" width="14" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_5" bpmnElement="Flow_Store_5">
+        <di:waypoint x="1040" y="430" />
+        <di:waypoint x="1080" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_6" bpmnElement="Flow_Store_6">
+        <di:waypoint x="1098" y="448" />
+        <di:waypoint x="1098" y="590" />
+        <di:waypoint x="1460" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_7" bpmnElement="Flow_Store_7">
+        <di:waypoint x="1580" y="590" />
+        <di:waypoint x="1620" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_8" bpmnElement="Flow_Store_8">
+        <di:waypoint x="1740" y="590" />
+        <di:waypoint x="1800" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_9" bpmnElement="Flow_Store_9">
+        <di:waypoint x="855" y="455" />
+        <di:waypoint x="855" y="500" />
+        <di:waypoint x="1140" y="500" />
+        <di:waypoint x="1140" y="470" />
+        <di:waypoint x="1220" y="470" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="879" y="483" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Store_10" bpmnElement="Flow_Store_10">
+        <di:waypoint x="1340" y="470" />
+        <di:waypoint x="1422" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_MessageFlow_OrderPlaced" bpmnElement="MessageFlow_OrderPlaced">
+        <di:waypoint x="448" y="300" />
+        <di:waypoint x="448" y="412" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="460" y="346" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_MessageFlow_OrderConfirmed" bpmnElement="MessageFlow_OrderConfirmed">
+        <di:waypoint x="980" y="390" />
+        <di:waypoint x="980" y="300" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="987" y="346" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_MessageFlow_PaymentReceived" bpmnElement="MessageFlow_PaymentReceived">
+        <di:waypoint x="1098" y="300" />
+        <di:waypoint x="1098" y="412" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1110" y="346" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_MessageFlow_ShipmentNotification" bpmnElement="MessageFlow_ShipmentNotification">
+        <di:waypoint x="1680" y="550" />
+        <di:waypoint x="1680" y="300" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1686" y="415" width="88" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_MessageFlow_OutOfStock" bpmnElement="MessageFlow_OutOfStock">
+        <di:waypoint x="1280" y="430" />
+        <di:waypoint x="1280" y="300" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1286" y="355" width="88" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

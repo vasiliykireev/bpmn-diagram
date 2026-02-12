@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>BPMN: Процесс продажи в интернет-магазине</title>
+  <meta name="description"
+    content="Визуализация BPMN 2.0 диаграммы типового процесса продажи в интернет-магазине: обработка заказа, проверка наличия, оплата, отгрузка и уведомления." />
+
+  <!-- required viewer styles (лучше подключить все три) -->
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.12.0/dist/assets/diagram-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.12.0/dist/assets/bpmn-js.css">
+  <link rel="stylesheet" href="https://unpkg.com/bpmn-js@18.12.0/dist/assets/bpmn-font/css/bpmn.css">
+
+  <!-- viewer distro (with pan and zoom) -->
+  <script src="https://unpkg.com/bpmn-js@18.12.0/dist/bpmn-navigated-viewer.development.js"></script>
+
+  <!-- needed for this example only -->
+  <script src="https://unpkg.com/jquery@3.3.1/dist/jquery.js"></script>
+
+  <style>
+    html,
+    body,
+    #canvas {
+      height: 100%;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* простая панель управления зумом */
+    #toolbar {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      z-index: 9999;
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      font-family: Arial, sans-serif;
+    }
+
+    #toolbar button {
+      width: 40px;
+      height: 32px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    #toolbar button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #status {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 10000;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      display: none;
+    }
+
+    #status.status-error {
+      display: block;
+      color: #7f1d1d;
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    #status.status-warning {
+      display: block;
+      color: #78350f;
+      background: #fffbeb;
+      border-color: #fde68a;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="status" role="alert" aria-live="assertive"></div>
+
+  <!-- кнопки зума -->
+  <div id="toolbar">
+    <button id="zoom-out" disabled title="Уменьшить">−</button>
+    <button id="zoom-in" disabled title="Увеличить">+</button>
+    <button id="zoom-fit" disabled title="Подогнать">[ ]</button>
+  </div>
+
+  <div id="canvas"></div>
+
+  <script>
+    var diagramUrl = 'diagram.bpmn';
+
+    // viewer instance
+    var bpmnViewer = new BpmnJS({
+      container: '#canvas'
+    });
+
+    // ссылки на canvas и текущий зум
+    var canvasRef = null;
+
+    // элементы управления
+    var zoomInBtn = document.getElementById('zoom-in');
+    var zoomOutBtn = document.getElementById('zoom-out');
+    var zoomFitBtn = document.getElementById('zoom-fit');
+    var statusEl = document.getElementById('status');
+
+    function enableZoomControls() {
+      zoomInBtn.disabled = false;
+      zoomOutBtn.disabled = false;
+      zoomFitBtn.disabled = false;
+    }
+
+    function disableZoomControls() {
+      zoomInBtn.disabled = true;
+      zoomOutBtn.disabled = true;
+      zoomFitBtn.disabled = true;
+    }
+
+    function clearStatus() {
+      statusEl.className = '';
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
+    }
+
+    function showStatus(type, message) {
+      statusEl.className = type === 'warning' ? 'status-warning' : 'status-error';
+      statusEl.textContent = message;
+    }
+
+    function formatError(err) {
+      if (!err) return 'Неизвестная ошибка.';
+      if (typeof err === 'string') return err;
+      if (err.message) return err.message;
+      try {
+        return JSON.stringify(err);
+      } catch (e) {
+        return String(err);
+      }
+    }
+
+    function zoomByFactor(factor) {
+      if (!canvasRef) return;
+
+      var current = canvasRef.zoom();          // текущий масштаб
+      var next = current * factor;
+
+      // ограничения (можно менять)
+      var MIN = 0.2;
+      var MAX = 4.0;
+      next = Math.max(MIN, Math.min(MAX, next));
+
+      canvasRef.zoom(next);
+    }
+
+    zoomInBtn.addEventListener('click', function () {
+      zoomByFactor(1.2); // +20%
+    });
+
+    zoomOutBtn.addEventListener('click', function () {
+      zoomByFactor(1 / 1.2); // -~16.7%
+    });
+
+    zoomFitBtn.addEventListener('click', function () {
+      if (!canvasRef) return;
+      canvasRef.zoom('fit-viewport');
+    });
+
+    /**
+     * Open diagram in our viewer instance.
+     *
+     * @param {String} bpmnXML diagram to display
+     */
+    async function openDiagram(bpmnXML) {
+      try {
+        clearStatus();
+        var result = await bpmnViewer.importXML(bpmnXML);
+        var warnings = result && result.warnings ? result.warnings : [];
+
+        // access viewer components
+        var canvas = bpmnViewer.get('canvas');
+
+        // сохраняем canvas для кнопок
+        canvasRef = canvas;
+        enableZoomControls();
+
+        // zoom to fit full viewport
+        canvas.zoom('fit-viewport');
+
+        if (warnings.length > 0) {
+          showStatus('warning', 'Диаграмма загружена с предупреждениями: ' + warnings[0].message);
+        }
+      } catch (err) {
+        disableZoomControls();
+        showStatus('error', 'Ошибка импорта BPMN: ' + formatError(err));
+        console.error('could not import BPMN 2.0 diagram', err);
+      }
+    }
+
+    // load external diagram file via AJAX and open it
+    fetch(diagramUrl)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status + ' while loading ' + diagramUrl);
+        }
+        return res.text();
+      })
+      .then(openDiagram)
+      .catch((err) => {
+        disableZoomControls();
+        showStatus('error', 'Ошибка загрузки файла диаграммы: ' + formatError(err));
+        console.error('could not load BPMN diagram', err);
+      });
+  </script>
+</body>
+
+</html>
